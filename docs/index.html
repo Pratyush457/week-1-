@@ -1,1 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <title>Content Prioritization with Machine Learning | FlyRank</title>
+
+  <meta
+    name="description"
+    content="A research artifact on prioritizing content pages for human review using search-performance signals."
+  >
+
+  <style>
+    :root {
+      --bg: #f7f7f5;
+      --card: #ffffff;
+      --text: #171717;
+      --muted: #666;
+      --line: #deded8;
+      --accent: #111;
+      --soft: #eeeeea;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: auto;
+      padding: 0 28px;
+    }
+
+    header {
+      padding: 90px 0 70px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(38px, 6vw, 68px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      max-width: 900px;
+      margin: 0 0 24px;
+    }
+
+    .subtitle {
+      font-size: 21px;
+      color: var(--muted);
+      max-width: 800px;
+      margin-bottom: 28px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(247,247,245,0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    nav .container {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    nav a:hover {
+      color: var(--text);
+    }
+
+    section {
+      padding: 70px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      font-size: 34px;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      margin: 0 0 25px;
+    }
+
+    h3 {
+      font-size: 21px;
+      margin-top: 35px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      max-width: 850px;
+    }
+
+    .abstract {
+      font-size: 20px;
+      max-width: 900px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 30px 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+    }
+
+    .card .number {
+      font-size: 30px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+
+    .card .label {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 25px 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--soft);
+      font-size: 14px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    code {
+      background: var(--soft);
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--card);
+      padding: 20px 24px;
+      margin: 28px 0;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .warning {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 22px;
+      margin: 25px 0;
+    }
+
+    ul {
+      max-width: 850px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .recommendation {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      margin: 15px 0;
+    }
+
+    .rank {
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    footer {
+      padding: 55px 0 80px;
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      header {
+        padding-top: 55px;
+      }
+
+      section {
+        padding: 50px 0;
+      }
+
+      .container {
+        padding: 0 18px;
+      }
+
+      .recommendation {
+        grid-template-columns: 55px 1fr;
+      }
+
+      th, td {
+        padding: 11px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="container">
+    <div class="eyebrow">Machine Learning Research Artifact · March 2026</div>
+
+    <h1>
+      Prioritizing Content Pages for Human Review Using Search-Performance Signals
+    </h1>
+
+    <p class="subtitle">
+      A directional machine-learning workflow for identifying observed CTR
+      opportunity signals and turning them into a human-reviewed content action queue.
+    </p>
+
+    <div class="meta">
+      <span class="pill">FlyRank ML Internship Dataset</span>
+      <span class="pill">Random Forest</span>
+      <span class="pill">Time-aware validation</span>
+      <span class="pill">Grouped-by-client validation</span>
+      <span class="pill">Decision support</span>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <div class="container">
+    <a href="#abstract">Abstract</a>
+    <a href="#introduction">Introduction</a>
+    <a href="#data">Data</a>
+    <a href="#methodology">Methodology</a>
+    <a href="#results">Results</a>
+    <a href="#limitations">Limitations</a>
+    <a href="#recommendations">Recommendations</a>
+    <a href="#reproducibility">Reproducibility</a>
+    <a href="#acknowledgments">Data Credit</a>
+  </div>
+</nav>
+
+<main>
+
+<section id="abstract">
+  <div class="container">
+    <div class="eyebrow">01 · Abstract</div>
+    <h2>Abstract</h2>
+
+    <p class="abstract">
+      This project asks whether search-performance signals can be used to
+      prioritize content pages for human review when deciding which pages
+      may have an observed CTR opportunity. The workflow uses March 2026
+      content-performance records and decision-time signals including
+      Google Search Console impressions, clicks, CTR, and average position.
+      A Random Forest was compared with a transparent Week-5 baseline and
+      then evaluated under a stricter grouped-by-client validation design.
+      On the Week-5 time-aware validation, the measured Precision@50 was
+      1.000 for the Random Forest compared with 0.860 for the baseline,
+      while the grouped-by-client validation measured 1.000 for both.
+      These results support using the output as directional decision-support
+      for human review, not as evidence that changing a page will cause
+      higher clicks or improved search performance.
+    </p>
+  </div>
+</section>
+
+
+<section id="introduction">
+  <div class="container">
+    <div class="eyebrow">02 · Introduction</div>
+    <h2>Introduction / Problem Statement</h2>
+
+    <p>
+      Content and SEO teams may have many pages that could potentially be
+      reviewed, but manual prioritization can be difficult when the available
+      portfolio is large. This project studies a narrower decision-support
+      question:
+    </p>
+
+    <div class="callout">
+      <strong>Research question:</strong>
+      Can observed search-performance signals be used to rank pages so that
+      a human reviewer can inspect potentially valuable CTR opportunities first?
+    </div>
+
+    <p>
+      The goal is therefore not to automatically rewrite pages or predict
+      guaranteed future performance. Instead, the model produces a ranked
+      review queue. The queue is intended to help a content or SEO team
+      decide what to inspect first.
+    </p>
+  </div>
+</section>
+
+
+<section id="data">
+  <div class="container">
+    <div class="eyebrow">03 · Data</div>
+    <h2>Data</h2>
+
+    <p>
+      The analysis uses the FlyRank ML Internship dataset and focuses on the
+      March 2026 content daily performance data available through the
+      dataset's public research environment.
+    </p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="number">3,536,466</div>
+        <div class="label">Rows available for modeling</div>
+      </div>
+
+      <div class="card">
+        <div class="number">1,617,502</div>
+        <div class="label">Positive target rows</div>
+      </div>
+
+      <div class="card">
+        <div class="number">300,000</div>
+        <div class="label">Rows used to train the Random Forest</div>
+      </div>
+
+      <div class="card">
+        <div class="number">March 2026</div>
+        <div class="label">Primary analysis window</div>
+      </div>
+    </div>
+
+    <h3>Decision-time signals</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Interpretation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>gsc_impressions</code></td>
+          <td>Observed search visibility / impressions.</td>
+        </tr>
+        <tr>
+          <td><code>gsc_clicks</code></td>
+          <td>Observed search clicks.</td>
+        </tr>
+        <tr>
+          <td><code>ctr_pct</code></td>
+          <td>Observed click-through rate.</td>
+        </tr>
+        <tr>
+          <td><code>gsc_avg_position</code></td>
+          <td>Observed average search position.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      Rows without the required search-performance information were excluded
+      from the relevant modeling steps. Client and content identifiers are
+      represented using hashed identifiers in the working analysis.
+    </p>
+  </div>
+</section>
+
+
+<section id="methodology">
+  <div class="container">
+    <div class="eyebrow">04 · Methodology</div>
+    <h2>Methodology</h2>
+
+    <h3>Target definition</h3>
+
+    <p>
+      The modeling target is a binary future-performance outcome derived
+      from the available content-performance data. A positive target
+      indicates that the observed future click outcome met the modeling
+      definition used in the Week-5 workflow.
+    </p>
+
+    <h3>Baseline</h3>
+
+    <p>
+      The baseline is a transparent ranking rule based on search visibility
+      and CTR-related signals. Its purpose is to provide a simple reference
+      against which the machine-learning ranking can be compared.
+    </p>
+
+    <h3>Model</h3>
+
+    <p>
+      The machine-learning model is a Random Forest trained using the
+      decision-time search-performance features. Training was limited to
+      300,000 rows for practical execution time.
+    </p>
+
+    <h3>Validation design</h3>
+
+    <p>
+      The Week-5 workflow used a time-aware split. The Week-6 audit added a
+      grouped-by-client split so that clients in the validation set were
+      separated from the clients used for training.
+    </p>
+
+    <div class="callout">
+      <strong>Why the second split matters:</strong>
+      A model can appear strong when related observations from the same
+      client occur across training and validation. Grouping by client tests
+      whether the ranking remains useful when the validation clients are
+      not represented in the training data.
+    </div>
+
+    <h3>Leakage audit</h3>
+
+    <p>
+      Features were reviewed for whether they would be available at the
+      decision point. The workflow focuses on search-performance signals
+      available before the future target period. Future click outcomes are
+      used to define the target rather than as model input.
+    </p>
+
+    <p>
+      The validation audit also checked whether the evaluation design could
+      make the model appear stronger than it would under a stricter split.
+      Results are therefore interpreted as measured validation results,
+      rather than causal evidence.
+    </p>
+  </div>
+</section>
+
+
+<section id="results">
+  <div class="container">
+    <div class="eyebrow">05 · Results</div>
+    <h2>Results</h2>
+
+    <h3>Week-5 time-aware validation</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Approach</th>
+          <th>Precision@50</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Week-4 baseline</td>
+          <td><strong>0.860</strong></td>
+        </tr>
+        <tr>
+          <td>Random Forest</td>
+          <td><strong>1.000</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      On this validation setup, the Random Forest measured higher Precision@50
+      than the baseline. This is an observed evaluation result for the
+      available dataset and split.
+    </p>
+
+    <h3>Week-6 grouped-by-client validation</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Approach</th>
+          <th>Precision@50</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Grouped baseline</td>
+          <td><strong>1.000</strong></td>
+        </tr>
+        <tr>
+          <td>Grouped Random Forest</td>
+          <td><strong>1.000</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warning">
+      <strong>Important interpretation:</strong>
+      The grouped validation does not demonstrate an advantage for the
+      Random Forest over the baseline. Both measured 1.000 Precision@50.
+      The perfect score should therefore not be presented as proof of
+      generalization or guaranteed future performance.
+    </div>
+
+    <h3>Feature importance</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Importance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>gsc_impressions</code></td>
+          <td>0.760313</td>
+        </tr>
+        <tr>
+          <td><code>ctr_pct</code></td>
+          <td>0.097216</td>
+        </tr>
+        <tr>
+          <td><code>gsc_avg_position</code></td>
+          <td>0.073220</td>
+        </tr>
+        <tr>
+          <td><code>gsc_clicks</code></td>
+          <td>0.069251</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The measured feature-importance output was dominated by
+      <code>gsc_impressions</code>. This suggests that visibility was the
+      strongest contributor to the Random Forest's ranking within this
+      feature set. Feature importance should not be interpreted as a causal
+      effect.
+    </p>
+  </div>
+</section>
+
+
+<section id="limitations">
+  <div class="container">
+    <div class="eyebrow">06 · Limitations</div>
+    <h2>Limitations & Honest Framing</h2>
+
+    <ul>
+      <li>
+        The model is a prioritization tool, not a causal model of what will
+        happen after changing a page.
+      </li>
+
+      <li>
+        Precision@50 is measured on the available validation data and does
+        not establish production performance.
+      </li>
+
+      <li>
+        The grouped validation produced the same measured Precision@50 for
+        the baseline and Random Forest, so the evidence does not show a
+        clear machine-learning advantage under that stricter design.
+      </li>
+
+      <li>
+        The model does not understand page intent, content quality, business
+        priorities, brand constraints, seasonality, or the suitability of
+        a proposed editorial change.
+      </li>
+
+      <li>
+        Training used a 300,000-row sample for practical execution rather
+        than the complete modeling population.
+      </li>
+
+      <li>
+        The results are directional and should not be assumed to transfer
+        unchanged to different clients, time periods, or content populations.
+      </li>
+    </ul>
+
+    <div class="callout">
+      <strong>Claim boundary:</strong>
+      The strongest supported claim is that the workflow produced a ranked
+      decision-support queue and achieved the reported validation metrics.
+      It does not establish that acting on the recommendations will cause
+      higher clicks, higher rankings, or changes in search-engine behaviour.
+    </div>
+  </div>
+</section>
+
+
+<section id="recommendations">
+  <div class="container">
+    <div class="eyebrow">07 · Recommendations</div>
+    <h2>Ranked Recommendations</h2>
+
+    <p>
+      The model output is converted into a practical review queue. The action
+      is to inspect a page, not automatically change it.
+    </p>
+
+    <div class="recommendation">
+      <div class="rank">01</div>
+      <div>
+        <h3>REVIEW_CTR</h3>
+        <p>
+          <strong>Reason code:</strong>
+          <code>CTR_OPPORTUNITY</code>
+        </p>
+        <p>
+          Prioritize pages with meaningful search visibility and relatively
+          low observed CTR for human review.
+        </p>
+      </div>
+    </div>
+
+    <div class="recommendation">
+      <div class="rank">02</div>
+      <div>
+        <h3>HUMAN_REVIEW</h3>
+        <p>
+          <strong>Reason code:</strong>
+          <code>REVIEW_BEFORE_CHANGE</code>
+        </p>
+        <p>
+          Review the page context before proposing any content or metadata
+          change.
+        </p>
+      </div>
+    </div>
+
+    <h3>Human review rules</h3>
+
+    <ul>
+      <li>Check whether the page's search intent matches the query demand.</li>
+      <li>Check whether the title and snippet accurately represent the page.</li>
+      <li>Check whether the page is already well optimized.</li>
+      <li>Check business, brand, and editorial constraints.</li>
+      <li>Check seasonality or unusual demand before changing content.</li>
+      <li>Record the reason for any change independently of the model score.</li>
+    </ul>
+
+    <h3>What should NOT be automated</h3>
+
+    <ul>
+      <li>Automatic title or metadata rewriting.</li>
+      <li>Automatic deletion or consolidation of pages.</li>
+      <li>Automatic changes to canonicalization or indexing directives.</li>
+      <li>Automatic publishing of content changes.</li>
+      <li>Automatic claims that a page will gain clicks or rankings.</li>
+    </ul>
+
+    <p>
+      The queue is intended to answer
+      <strong>"what should a human review first?"</strong>
+      rather than
+      <strong>"what change should the system make automatically?"</strong>
+    </p>
+  </div>
+</section>
+
+
+<section id="reproducibility">
+  <div class="container">
+    <div class="eyebrow">08 · Reproducibility</div>
+    <h2>Reproducibility</h2>
+
+    <p>
+      The analysis is organized as a sequence of notebooks covering model
+      development, validation, and action-playbook construction.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Artifact</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>w05_model.ipynb</code></td>
+          <td>Model development and baseline comparison.</td>
+        </tr>
+        <tr>
+          <td><code>w06_validation_audit.ipynb</code></td>
+          <td>Grouped validation, leakage audit, and claim review.</td>
+        </tr>
+        <tr>
+          <td><code>w07_action_playbook.ipynb</code></td>
+          <td>Ranked recommendations and action queue.</td>
+        </tr>
+        <tr>
+          <td><code>capstone.ipynb</code></td>
+          <td>Capstone analysis and paper-ready artifacts.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The complete working artifacts are maintained in the project repository.
+    </p>
+
+    <p>
+      <a href="https://github.com/Pratyush457/week-1-" target="_blank">
+        View the GitHub repository →
+      </a>
+    </p>
+  </div>
+</section>
+
+
+<section id="acknowledgments">
+  <div class="container">
+    <div class="eyebrow">09 · Acknowledgments</div>
+    <h2>Acknowledgments & Data Credit</h2>
+
+    <p>
+      Built on the FlyRank ML Internship dataset.
+    </p>
+
+    <p>
+      <a href="https://flyrank.ai" target="_blank" rel="noopener">
+        FlyRank
+      </a>
+    </p>
+
+    <p class="small">
+      This project is an educational research artifact and decision-support
+      prototype. It is not a production SEO automation system.
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container">
+    <p>
+      Content Prioritization with Machine Learning · Research Artifact
+    </p>
+
+    <p class="small">
+      Claims are intentionally framed as observed, measured, directional,
+      and decision-support findings.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
